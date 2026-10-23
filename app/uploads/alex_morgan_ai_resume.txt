@@ -1,0 +1,7 @@
+Alex Morgan
+Email: alex.morgan@example.com
+Phone: +1 555-019-2834
+Education: Bachelor of Science in Computer Science, Expected Grad: 2027, CGPA 8.8 / 10
+Summary: Machine Learning Engineer specializing in Python, PyTorch, Deep Learning, Generative AI, LLM fine-tuning, RAG, NLP, FastAPI, and Docker.
+Projects: Built production RAG multi-agent system with LangChain and vector databases.
+Experience: AI Engineer Intern at TechAI Labs (6 months).
