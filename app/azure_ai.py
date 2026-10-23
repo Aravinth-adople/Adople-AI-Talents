@@ -77,7 +77,7 @@ def analyze_resume_with_ai(raw_text: str, filename: str = "", active_jd_id: str 
         '  "email": "email or null",\n'
         '  "phone": "phone or null",\n'
         '  "passout_year": 2027,\n'
-        '  "cgpa": 8.5,\n'
+        '  "cgpa": 8.5, // Extract ONLY college/university CGPA or college percentage (out of 10 scale, e.g. 85% -> 8.5). Strictly DO NOT extract 10th/12th school marks or project percentages. Return null if college CGPA is not given.\n'
         '  "degree": "B.Tech Computer Science",\n'
         '  "primary_category": "One category from the list above",\n'
         '  "secondary_categories": ["Category 2", "Category 3"],\n'
@@ -119,6 +119,21 @@ def analyze_resume_with_ai(raw_text: str, filename: str = "", active_jd_id: str 
             content = data["choices"][0]["message"]["content"]
             cleaned = clean_json_response(content)
             result = json.loads(cleaned)
+            # Ensure CGPA is strictly on a 10.0 scale and numeric
+            if "cgpa" in result and result["cgpa"] is not None:
+                try:
+                    c_val = float(result["cgpa"])
+                    if 10.0 < c_val <= 100.0:
+                        result["cgpa"] = round(c_val / 10.0, 2)
+                    elif 0.0 < c_val <= 10.0:
+                        result["cgpa"] = round(c_val, 2)
+                    else:
+                        result["cgpa"] = None
+                except (ValueError, TypeError):
+                    result["cgpa"] = None
+            else:
+                result["cgpa"] = None
+
             result["ai_evaluated"] = True
             result["ai_model"] = "gpt-6-luna (Azure OpenAI)"
             return result

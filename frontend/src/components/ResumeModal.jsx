@@ -420,7 +420,7 @@ export default function ResumeModal({
               <div style={{ background: '#F8FAFC', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
                 <span style={{ fontSize: '0.68rem', color: '#64748B', display: 'block', textTransform: 'uppercase' }}>CGPA / Score</span>
                 <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#0F172A' }}>
-                  {currentCandidate.cgpa ? `${currentCandidate.cgpa} / 10.0` : 'Not Specified'}
+                  {currentCandidate.cgpa ? `${currentCandidate.cgpa > 10 ? (currentCandidate.cgpa / 10).toFixed(2) : currentCandidate.cgpa} / 10.0` : 'Not Specified'}
                 </span>
               </div>
             </div>

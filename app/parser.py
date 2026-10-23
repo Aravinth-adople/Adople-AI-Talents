@@ -226,6 +226,151 @@ def extract_contact_info(text: str) -> Dict[str, Optional[str]]:
         'linkedin': linkedin
     }
 
+def extract_college_cgpa(text: str) -> Optional[float]:
+    """
+    Extracts strictly the college/university CGPA or college degree percentage.
+    Strictly ignores:
+    - 10th / SSLC / Matriculation / Secondary school marks/percentages
+    - 12th / HSC / Intermediate / Higher secondary marks/percentages
+    - Project metrics, performance stats, accuracy figures, test platform scores
+    Converts percentages on a 100-point scale to a 10-point scale (e.g., 85% -> 8.5).
+    Returns None if no college CGPA/grade was found.
+    """
+    if not text:
+        return None
+
+    # Normalize unicode punctuation and quotes
+    clean_text = text.replace('\u2013', '-').replace('\u2014', '-').replace('\u2012', '-')
+    clean_text = clean_text.replace('\u2022', ' ').replace('\u00a0', ' ').replace('\ufeff', '')
+    
+    # Negative school patterns (High school, SSLC, 10th, HSC, 12th)
+    school_pattern = re.compile(
+        r'\b(10th|tenth|sslc|class\s*x\b|class\s*10\b|secondary\s*school|high\s*school|matric\b|matriculation|'
+        r'12th|twelfth|hsc|class\s*xii\b|class\s*12\b|higher\s*secondary|intermediate|\+2|puc|pre-university|'
+        r'school|vidyalaya|junior\s*college)\b',
+        re.IGNORECASE
+    )
+    
+    # College degree/institution patterns
+    college_pattern = re.compile(
+        r'\b(b\.?e\.?\b|b\.?tech\b|bachelor|b\.?sc\b|bca\b|m\.?e\.?\b|m\.?tech\b|master|mca\b|m\.?sc\b|mba\b|b\.?com\b|bba\b|'
+        r'undergraduate|postgraduate|ug\b|pg\b|degree\b|engineering|technology|polytechnic|'
+        r'college|university|institute|campus|autonomous|affiliated)\b',
+        re.IGNORECASE
+    )
+    
+    # Non-grade phrases where cgpa/gpa word might appear (e.g. apps or tools)
+    ignore_cgpa_phrase = re.compile(
+        r'\b(calculator|automation|adopted|tracking|app\b|application|developed\s+a)\b',
+        re.IGNORECASE
+    )
+
+    # Project / work experience metric indicators
+    metric_pattern = re.compile(
+        r'\b(improved|reducing|reduced|increase|increased|accuracy|latency|efficiency|pass\s*rate|'
+        r'coverage|performance\s*by|growth\s*by|speed\s*up|responsiveness)\b',
+        re.IGNORECASE
+    )
+
+    lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
+
+    # Break up lines at school section starts (e.g. "HSC", "SSLC", "10th", "12th")
+    # This separates concatenated lines into distinct college and school segments!
+    segments = []
+    for line in lines:
+        parts = re.split(r'(?=\b(?:hsc|sslc|10th|12th|higher\s*secondary|secondary\s*school|class\s*x\b|class\s*xii\b)\b)', line, flags=re.IGNORECASE)
+        for p in parts:
+            p_strip = p.strip()
+            if p_strip:
+                segments.append(p_strip)
+
+    # Pass 1: Explicit CGPA / GPA / CCPA / SGPA
+    cgpa_candidates = [] # (val, priority)
+
+    cgpa_regexes = [
+        r'(?:cumulative\s+)?(?:cgpa|ccpa|c\.g\.p\.a|gpa|g\.p\.a|sgpa)(?:\s*\([^)]*\))?[\s:\-=]+([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*(?:/\s*(10(?:\.0)?|4(?:\.0)?|100))?',
+        r'\b([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*(?:/\s*(10(?:\.0)?|4(?:\.0)?))?\s*(?:cgpa|ccpa|gpa|sgpa)\b',
+        r'(?:cgpa|ccpa|gpa)\s+(?:of\s+)?([0-9]{1,2}(?:\.[0-9]{1,2})?)\b'
+    ]
+
+    for idx, seg in enumerate(segments):
+        if ignore_cgpa_phrase.search(seg):
+            continue
+
+        for pat in cgpa_regexes:
+            m = re.search(pat, seg, re.IGNORECASE)
+            if m:
+                # If segment mentions school and DOES NOT mention college, strictly skip!
+                if school_pattern.search(seg) and not college_pattern.search(seg):
+                    continue
+
+                try:
+                    val = float(m.group(1))
+                    scale = m.group(2) if len(m.groups()) > 1 and m.group(2) else None
+                    
+                    if scale and "4" in scale:
+                        converted = round((val / 4.0) * 10.0, 2)
+                    elif scale and "100" in scale:
+                        converted = round(val / 10.0, 2)
+                    elif 0.0 < val <= 10.0:
+                        converted = round(val, 2)
+                    elif 10.0 < val <= 100.0:
+                        converted = round(val / 10.0, 2)
+                    else:
+                        converted = None
+
+                    if converted is not None:
+                        has_college = bool(college_pattern.search(seg))
+                        window = " ".join(segments[max(0, idx-3):min(len(segments), idx+4)])
+                        if college_pattern.search(window):
+                            has_college = True
+
+                        has_school = bool(school_pattern.search(seg))
+
+                        if has_college and not has_school:
+                            cgpa_candidates.append((converted, 1))
+                        elif not has_school:
+                            cgpa_candidates.append((converted, 2))
+                except ValueError:
+                    pass
+
+    if cgpa_candidates:
+        cgpa_candidates.sort(key=lambda x: x[1])
+        return cgpa_candidates[0][0]
+
+    # Pass 2: College Degree/Institution + Percentage (Only if no explicit CGPA found)
+    # Strictly for College/University (never school, never project metrics)
+    for idx, seg in enumerate(segments):
+        if metric_pattern.search(seg) or school_pattern.search(seg):
+            continue
+
+        pct_match = re.search(
+            r'(?:aggregate|percentage|score|marks|grade)?[\s:\-=]*([5-9][0-9](?:\.[0-9]{1,2})?)\s*%',
+            seg, re.IGNORECASE
+        ) or re.search(
+            r'\(\s*([5-9][0-9](?:\.[0-9]{1,2})?)\s*%\s*\)',
+            seg, re.IGNORECASE
+        )
+
+        if not pct_match:
+            continue
+
+        val = float(pct_match.group(1))
+        if not (40.0 <= val <= 100.0):
+            continue
+
+        # If this segment mentions college, it is a direct college percentage
+        if college_pattern.search(seg):
+            return round(val / 10.0, 2)
+
+        # Check immediate adjacent segments
+        preceding = (idx > 0 and college_pattern.search(segments[idx-1]) and not school_pattern.search(segments[idx-1]))
+        following = (idx < len(segments)-1 and college_pattern.search(segments[idx+1]) and not school_pattern.search(segments[idx+1]))
+        if preceding or following:
+            return round(val / 10.0, 2)
+
+    return None
+
 def extract_education(text: str) -> Dict[str, Any]:
     clean = text.lower()
     
@@ -259,30 +404,10 @@ def extract_education(text: str) -> Dict[str, Any]:
     if not passout_year:
         passout_year = 2025 # Default reasonable median for freshers
 
-    # 2. CGPA / Percentage
-    cgpa = None
-    
-    cgpa_patterns = [
-        r'(?:cgpa|gpa|score|grade)(?:[\s:\-]+|(?:[\s]+of[\s]+))([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*(?:/10|/100|%|\b)',
-        r'\b([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*(?:cgpa|gpa|/10\b)',
-        r'(?:percentage|aggregate|marks)[\s:\-]*([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*%',
-        r'\b([4-9][0-9](?:\.[0-9]{1,2})?)\s*%'
-    ]
-    for pat in cgpa_patterns:
-        m = re.search(pat, clean)
-        if m:
-            try:
-                val = float(m.group(1))
-                if 10.0 < val <= 100.0:
-                    # Convert percentage (e.g. 89% -> 8.9, 81.2% -> 8.12) to out of 10
-                    cgpa = round(val / 10.0, 2)
-                    break
-                elif 0.0 < val <= 10.0:
-                    cgpa = round(val, 2)
-                    break
-            except:
-                pass
-    # If no CGPA/percentage found, keep cgpa as None (do not set false defaults)
+    # 2. College CGPA / Percentage
+    # Strictly extracts only college/university CGPA or college degree percentage (scaled to /10)
+    # Never extracts school (10th/12th/SSLC/HSC) or non-college metrics/numbers.
+    cgpa = extract_college_cgpa(text)
 
     # 3. Degree & Department
     degree = "B.E / B.Tech"
