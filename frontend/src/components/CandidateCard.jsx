@@ -91,7 +91,7 @@ export default function CandidateCard({
             <span>{passout_year} Batch</span>
           </span>
           <span className="candidate-meta-chip">
-            {cgpa ? `${cgpa} CGPA` : '7.5 CGPA'}
+            {cgpa ? `${cgpa > 10 ? (cgpa / 10).toFixed(1) : cgpa} CGPA` : '-'}
           </span>
           <span className="candidate-meta-chip">{degree || "Bachelor's"}</span>
         </div>

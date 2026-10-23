@@ -403,7 +403,7 @@ export default function CandidateDrawer({
               <div className="detail-cell">
                 <span className="detail-label">CGPA / Score</span>
                 <span className="detail-value">
-                  {candidate.cgpa ? `${candidate.cgpa} / 10.0` : 'Not Specified'}
+                  {candidate.cgpa ? `${candidate.cgpa > 10 ? (candidate.cgpa / 10).toFixed(1) : candidate.cgpa} / 10.0` : '-'}
                 </span>
               </div>
 

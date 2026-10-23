@@ -153,7 +153,7 @@ def upsert_candidate(c: Dict[str, Any]) -> int:
         c.get('github', ''),
         c.get('linkedin', ''),
         c.get('passout_year', 2025),
-        c.get('cgpa', 7.5),
+        c.get('cgpa'),
         c.get('degree', "Bachelor's"),
         c.get('primary_category', 'Other'),
         sec_cats,
@@ -224,7 +224,7 @@ def bulk_upsert_candidates(candidates_list: List[Dict[str, Any]]) -> int:
             c.get('github', ''),
             c.get('linkedin', ''),
             c.get('passout_year', 2025),
-            c.get('cgpa', 7.5),
+            c.get('cgpa'),
             c.get('degree', "Bachelor's"),
             c.get('primary_category', 'Other'),
             sec_cats,
@@ -321,6 +321,10 @@ def get_candidates(
 
     order_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
     
+    order_clause = f"{sort_column} {order_dir}, id ASC"
+    if sort_by == "cgpa":
+        order_clause = f"CASE WHEN cgpa IS NULL THEN 1 ELSE 0 END, cgpa {order_dir}, id ASC"
+    
     offset = (page - 1) * page_size
     
     query = f"""
@@ -333,7 +337,7 @@ def get_candidates(
         created_at
     FROM candidates 
     WHERE {where_clause}
-    ORDER BY {sort_column} {order_dir}, id ASC
+    ORDER BY {order_clause}
     LIMIT ? OFFSET ?
     """
     params.extend([page_size, offset])

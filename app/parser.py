@@ -261,34 +261,28 @@ def extract_education(text: str) -> Dict[str, Any]:
 
     # 2. CGPA / Percentage
     cgpa = None
-    percentage = None
     
-    # Look for explicit CGPA: 8.42 or 8.42/10 or CGPA - 8.42
-    cgpa_m = re.search(r'(?:cgpa|gpa|score)[\s:\-]*([6-9]\.[0-9]{1,2}|10(?:\.0)?)\b|\b([6-9]\.[0-9]{1,2})\s*(?:cgpa|gpa|/10)', clean)
-    if cgpa_m:
-        val = cgpa_m.group(1) or cgpa_m.group(2)
-        try:
-            cgpa = float(val)
-        except:
-            pass
-            
-    # Look for Percentage: e.g. 85.4% or 78%
-    pct_m = re.search(r'(?:percentage|aggregate|marks)[\s:\-]*([5-9][0-9](?:\.[0-9]{1,2})?)\s*%?|\b([5-9][0-9](?:\.[0-9]{1,2})?)\s*%', clean)
-    if pct_m:
-        val = pct_m.group(1) or pct_m.group(2)
-        try:
-            percentage = float(val)
-            if not cgpa:
-                # Convert percentage to ~10-point CGPA standard
-                cgpa = round(percentage / 9.5, 2)
-        except:
-            pass
-
-    if not cgpa:
-        cgpa = 7.50 # Reasonable default standard
-        
-    # Cap CGPA realistically between 5.0 and 10.0
-    cgpa = max(5.0, min(10.0, round(cgpa, 2)))
+    cgpa_patterns = [
+        r'(?:cgpa|gpa|score|grade)(?:[\s:\-]+|(?:[\s]+of[\s]+))([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*(?:/10|/100|%|\b)',
+        r'\b([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*(?:cgpa|gpa|/10\b)',
+        r'(?:percentage|aggregate|marks)[\s:\-]*([0-9]{1,2}(?:\.[0-9]{1,2})?)\s*%',
+        r'\b([4-9][0-9](?:\.[0-9]{1,2})?)\s*%'
+    ]
+    for pat in cgpa_patterns:
+        m = re.search(pat, clean)
+        if m:
+            try:
+                val = float(m.group(1))
+                if 10.0 < val <= 100.0:
+                    # Convert percentage (e.g. 89% -> 8.9, 81.2% -> 8.12) to out of 10
+                    cgpa = round(val / 10.0, 2)
+                    break
+                elif 0.0 < val <= 10.0:
+                    cgpa = round(val, 2)
+                    break
+            except:
+                pass
+    # If no CGPA/percentage found, keep cgpa as None (do not set false defaults)
 
     # 3. Degree & Department
     degree = "B.E / B.Tech"

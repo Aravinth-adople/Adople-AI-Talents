@@ -165,8 +165,14 @@ export default function CandidateTable({
 
                 {/* CGPA */}
                 <td>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                    {c.cgpa ? `${c.cgpa}` : '7.5'}
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: c.cgpa ? 'var(--text-primary)' : 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  >
+                    {c.cgpa ? (c.cgpa > 10 ? (c.cgpa / 10).toFixed(1) : c.cgpa) : '-'}
                   </span>
                 </td>
 

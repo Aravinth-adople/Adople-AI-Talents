@@ -666,7 +666,7 @@ async def export_candidates_csv(
             excel_hyperlink,
             view_url,
             c.get("passout_year") or "",
-            c.get("cgpa") if c.get("cgpa") is not None else "",
+            (round(c["cgpa"] / 10.0, 2) if c["cgpa"] > 10 else round(c["cgpa"], 2)) if c.get("cgpa") is not None else "-",
             clean_text_for_export(c.get("degree") or ""),
             clean_text_for_export(c.get("primary_category") or "Other"),
             sec_cats,
